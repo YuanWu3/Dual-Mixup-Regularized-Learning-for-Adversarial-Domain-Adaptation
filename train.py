@@ -102,8 +102,6 @@ class AdversarialNetwork(nn.Module):
 
     def output_num(self):
         return 1
-    def get_parameters(self):
-        return [{"params":self.parameters(), "lr_mult":10, 'decay_mult':2}]
 
 
 def mixup_data(x, y, alpha = 0.2):
@@ -134,7 +132,7 @@ def DANN(features, ad_net):
     dc_target = torch.from_numpy(np.array([[1]] * batch_size + [[0]] * batch_size)).float().cuda()
     return nn.BCELoss()(ad_out, dc_target)
 
-def train(args, G, C, ad_net, train_loader, train_loader1, optimizer_G, optimizer_C, optimizer_ad, epoch, start_epoch, device):
+def train(args, G, C, ad_net, train_loader, train_loader1, optimizer_G, optimizer_C, optimizer_ad, epoch, start_epoch):
     G.train()
     C.train()
     criterion = nn.CrossEntropyLoss().cuda()
@@ -151,9 +149,9 @@ def train(args, G, C, ad_net, train_loader, train_loader1, optimizer_G, optimize
         if batch_idx % len_target == 0:
             iter_target = iter(train_loader1)
         data_source, label_source = iter_source.next()
-        data_source, label_source = data_source.to(device), label_source.to(device)
+        data_source, label_source = data_source.cuda(), label_source.cuda()
         data_target, label_target = iter_target.next()
-        data_target = data_target.to(device)
+        data_target = data_target.cuda()
         optimizer_G.zero_grad()
         optimizer_C.zero_grad()
         optimizer_ad.zero_grad()
@@ -191,13 +189,13 @@ def train(args, G, C, ad_net, train_loader, train_loader1, optimizer_G, optimize
                 epoch, batch_idx*args.batch_size, num_iter*args.batch_size,
                 100. * batch_idx / num_iter, loss.item()))
 
-def test(args, G, C, test_loader, device):
+def test(args, G, C, test_loader):
     G.eval()
     C.eval()
     test_loss = 0
     correct = 0
     for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
+            data, target = data.cuda(), target.cuda()
             feature = G(data)
             output = C(feature)
             test_loss += nn.CrossEntropyLoss()(output, target).item()
@@ -228,9 +226,6 @@ def main():
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(torch.cuda.is_available())
-          
 
     if args.task == 'U2M':
         source_list = '/data/usps_train.txt'
@@ -269,18 +264,17 @@ def main():
 
     G = LeNet_Feature()
     C = LeNet_Classifier()
-    G, C = G.to(device), C.to(device)
-    class_num = 10
+    G, C = G.cuda(), C.cuda()
     ad_net = AdversarialNetwork(C.output_num(), 500)
         
-    ad_net = ad_net.to(device)
+    ad_net = ad_net.cuda()
     optimizer_G = optim.Adam(G.parameters(), lr=args.lr, weight_decay=0.0005)
     optimizer_C = optim.Adam(C.parameters(), lr=args.lr, weight_decay=0.0005)
     optimizer_ad = optim.Adam(ad_net.parameters(), lr=args.lr, weight_decay=0.0005)
 
     for epoch in range(1, args.epochs + 1):
-        train(args, G, C, ad_net, train_loader, train_loader1, optimizer_G, optimizer_C, optimizer_ad, epoch, start_epoch, device)
-        test(args, G, C, test_loader, device)
+        train(args, G, C, ad_net, train_loader, train_loader1, optimizer_G, optimizer_C, optimizer_ad, epoch, start_epoch)
+        test(args, G, C, test_loader)
 
 if __name__ == '__main__':
     main()
