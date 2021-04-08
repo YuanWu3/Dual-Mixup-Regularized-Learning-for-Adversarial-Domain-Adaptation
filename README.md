@@ -1,4 +1,4 @@
-# Dual-Mixup-Regularized-Learning
+# Dual-Mixup-Regularized-Learning-for-Adversarial-Domain-Adaptation
 Implementation of "Dual Mixup Regularized Learning for Adversarial Domain Adaptation" in Pytorch (ECCV 2020)
 
 ## Datasets
